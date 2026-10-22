@@ -1,0 +1,34 @@
+# Netscape HTTP Cookie File
+# Contoh cara mendapatkan file ini:
+# 1. Buka browser Chrome / Edge di PC Anda, lalu login ke akun YouTube / Google.
+# 2. Pasang ekstensi "Get cookies.txt LOCALLY" dari Chrome Web Store:
+#    https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc
+# 3. Klik ekstensi saat berada di tab youtube.com, lalu klik "Export" dan simpan sebagai cookies.txt di folder ini.
+# 4. Git push ke Heroku atau paste isinya ke Heroku Config Var: YOUTUBE_COOKIE.
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.youtube.com	TRUE	/	TRUE	1808865204	LOGIN_INFO	AFmmF2swRAIgFtjt8_AmBkW3nzgCW9153CqCXrY5PajY8AqzV_loM2oCICNqENYqMvaFRrPjdtoINSX6EUjU6N9RQdzWdWNLGBtB:QUQ3MjNmeGtNRlFpOHd1TGpPOFE5aFA3M3dTZTExb2djbl9lY3l2aDhMUi00NjVWSWgwdURhYmh5Q1lmQWdoZklQOHF4U2dpM0RWVEJZVmtpanN1M3lrWnplMXBhcDN1b1NzdTJmN1FXendTT3lGNVkwZDZraG9Od1RXVWVFS1ZBN0VBS1pQWXJHVVREQXJiS2hrZ2t0NDNXWS1BcjhNSjZ3
+.youtube.com	TRUE	/	TRUE	1827248027	PREF	f4=4010000&f6=40000000&tz=Asia.Jakarta&f5=20000&f7=100
+.youtube.com	TRUE	/	TRUE	1806728531	__Secure-BUCKET	CKMF
+.youtube.com	TRUE	/	FALSE	1827142192	HSID	AyWYowDU7c1YoYNfq
+.youtube.com	TRUE	/	TRUE	1827142192	SSID	AVwnsurzqGoh3ryMb
+.youtube.com	TRUE	/	FALSE	1827142192	APISID	2Bd1_RUOLMyXyW5n/AsaAs0ItybpYP2mwv
+.youtube.com	TRUE	/	TRUE	1827142192	SAPISID	sv-VoLvJ8-hfntc7/AaGL0lwJWIQRp-XrQ
+.youtube.com	TRUE	/	TRUE	1827142192	__Secure-1PAPISID	sv-VoLvJ8-hfntc7/AaGL0lwJWIQRp-XrQ
+.youtube.com	TRUE	/	TRUE	1827142192	__Secure-3PAPISID	sv-VoLvJ8-hfntc7/AaGL0lwJWIQRp-XrQ
+.youtube.com	TRUE	/	FALSE	1827142192	SID	g.a000Dwn6-BGDjedNIMqO69Tx0s-b2kuHOonptXuYlSBe2dxObVZHvkkC-QJgmAvp5C4YFSjxHwACgYKASYSARQSFQHGX2MiuPCQdsuY_gfr-Y5-V9V3BBoVAUF8yKrERRDpHha3YLatqvTJsWdb0076
+.youtube.com	TRUE	/	TRUE	1827142192	__Secure-1PSID	g.a000Dwn6-BGDjedNIMqO69Tx0s-b2kuHOonptXuYlSBe2dxObVZHv7CANJfPPfVWncjlkp_ELgACgYKAXwSARQSFQHGX2Mih_bXebIPYb9oY_9dY_-ADxoVAUF8yKrFg9_mPwYYXW0_a8JnV8Ct0076
+.youtube.com	TRUE	/	TRUE	1827142192	__Secure-3PSID	g.a000Dwn6-BGDjedNIMqO69Tx0s-b2kuHOonptXuYlSBe2dxObVZH6V08ONtl5cN2txB0ep6H6AACgYKAWASARQSFQHGX2Mi3ZmA62zXuivOlF0HxPNJIRoVAUF8yKoRaQe8jHmKuDGH4MKhsfLw0076
+.youtube.com	TRUE	/	TRUE	1808498854	NID	CtoBCAESjAEBOxGDSCjb_xs6wWYNUOoYDaEgwHapelxTOSNcUFHbGkVAQmX53WPWTp7SKlW_RulAdVjvSQE118nKRqXdKFU7rhuoBXBKL7nVfvkpBld7JxpEYW_WvyK-Hq7nGbhHuaHUHeHkqP3JNzwJLZFR-8PyH483uaw-5mBINzBMHzwXKgBk9JMmRsSy6IyrVSgBMkUB0qwHz9jz6o4tOldhja5Q6brJ6jJJGx-zN9UYOA3J_uqim03eAL1wBcDqEWeMbkfIHEj0LsClVaDdsBepW_L714b1aQI
+.youtube.com	TRUE	/	TRUE	1824223657	__Secure-1PSIDTS	sidts-CjUBkldj_70I5y2sMAIQ7kzp5lcJUzSzSe0vD5rcJDuQ3gICMZzmtqxi-7wfcNylDVOHdjji1RAA
+.youtube.com	TRUE	/	TRUE	1824223657	__Secure-3PSIDTS	sidts-CjUBkldj_70I5y2sMAIQ7kzp5lcJUzSzSe0vD5rcJDuQ3gICMZzmtqxi-7wfcNylDVOHdjji1RAA
+.youtube.com	TRUE	/	FALSE	1824224030	SIDCC	APD_SKHhCc0wriUaw04DtAQBFybEJxIgOrrj0lKbqd6SeRwrOA4FgBPKZBytd4wQk8VMNPaAUBQ
+.youtube.com	TRUE	/	TRUE	1824224030	__Secure-1PSIDCC	APD_SKEBteuKbfmlL1mJ8KyvWATxbkm4b-EPSrtaGT-EtKU-XSUBiVyuDq5Lhda4AHcbodkWZg
+.youtube.com	TRUE	/	TRUE	1824224030	__Secure-3PSIDCC	APD_SKEJGh1SSo2fEj0vsk3rToIW9q2I8pUEmteJ8wSxYrT9n2vOB1S3vDIaYJiyhBlClHG7lQU
+.youtube.com	TRUE	/	TRUE	1808239670	VISITOR_INFO1_LIVE	zKcY_FN2a0g
+.youtube.com	TRUE	/	TRUE	1808239670	VISITOR_PRIVACY_METADATA	CgJJRBIEGgAgQg%3D%3D
+.youtube.com	TRUE	/	TRUE	1808238174	__Secure-YNID	Cu0BCAUSnwEB8QZuZi9-fi87Atw5TBBb7f71oJBQngAKYL8Mvwi1u_e1STkbF9bSfjMXnI6oR-jVgUagbu_zGIHuHjbkm7wP5OYvHYosyO4U8JL8Bi3qjc9QHzjiDZ0FuWhFMcAhXdk3wgOhdFNwqQWRfb17G8oWiia-9DkPK78BruBqxIWcLdHpvvJgeOxSEzyK3ZcfNW9BCL3xazzkmODj29XcT04oBTJFAd6pnU-dMz8M2oM2y9DbJYM6Uo-89qmdih1Up6w45uWrvDHK7ecacoqXKZ8nYCzuslxcd7OSpO-D7iVLdTEBjsb4zcIK
+.youtube.com	TRUE	/	TRUE	0	YSC	586pdGd4SyM
+.youtube.com	TRUE	/	TRUE	1808238174	__Secure-ROLLOUT_TOKEN	CMTj65Pg6cCVWxDnl8PwibeTAxiYnMW0hM6XAw%3D%3D

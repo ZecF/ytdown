@@ -12,12 +12,33 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const cp = require('child_process');
 const { Ytdl, createPoTokenProvider } = require('@distube/ytdl-core');
 const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Helper: load YouTube cookie from env var YOUTUBE_COOKIE or local cookies.txt
+function getCookie() {
+  if (process.env.YOUTUBE_COOKIE && process.env.YOUTUBE_COOKIE.trim()) {
+    return process.env.YOUTUBE_COOKIE.trim();
+  }
+  const cookieFile = path.join(__dirname, 'cookies.txt');
+  if (fs.existsSync(cookieFile)) {
+    try {
+      const content = fs.readFileSync(cookieFile, 'utf8').trim();
+      if (content) {
+        console.log('🍪 Loaded YouTube cookie from cookies.txt');
+        return content;
+      }
+    } catch (e) {
+      console.warn('⚠️ Gagal membaca cookies.txt:', e.message);
+    }
+  }
+  return undefined;
+}
 
 // Dynamic Ytdl instance manager with Proof-of-Origin (PO Token) & Cookie support
 // Bypasses YouTube datacenter bot detection ("Sign in to confirm you're not a bot") on Heroku/AWS
@@ -28,17 +49,20 @@ async function getYtdl() {
   if (ytdlInstance) return ytdlInstance;
   if (!poTokenPromise) {
     poTokenPromise = (async () => {
-      const cookie = process.env.YOUTUBE_COOKIE || undefined;
+      const cookie = getCookie();
+      if (cookie) {
+        console.log('🔐 Initializing Ytdl with authenticated YouTube session (signedIn: true)');
+      }
       try {
         console.log('🔄 Minting PO Token provider for cloud/Heroku bypass...');
         const poTokenProvider = await createPoTokenProvider({ timeoutMs: 25000 });
-        console.log('✅ PO Token provider active (YouTube bot detection bypassed)');
+        console.log('✅ PO Token provider active');
         return new Ytdl({
           getPoToken: poTokenProvider,
           cookie: cookie
         });
       } catch (err) {
-        console.warn('⚠️ Could not mint PO Token, falling back to default client:', err.message);
+        console.warn('⚠️ Could not mint PO Token, falling back to client:', err.message);
         return new Ytdl({ cookie: cookie });
       }
     })();
@@ -278,9 +302,14 @@ async function handleInfo(req, res) {
 
   } catch (err) {
     console.error('Error fetching video info:', err);
+    let msg = err.message || 'Error tidak diketahui';
+    if (err.code === 'BOT_CHECK' || (err.message && err.message.toLowerCase().includes('bot'))) {
+      msg = 'YouTube mendeteksi IP Datacenter Heroku (Bot Check). Masukkan YOUTUBE_COOKIE di Config Vars Heroku untuk mengaktifkan sesi terautentikasi.';
+    }
     return res.status(500).json({
       success: false,
-      error: 'Gagal mengambil metadata video YouTube: ' + (err.message || 'Error tidak diketahui')
+      code: err.code || 'ERROR',
+      error: 'Gagal mengambil metadata video YouTube: ' + msg
     });
   }
 }
