@@ -13,12 +13,42 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const cp = require('child_process');
-const { Ytdl } = require('@distube/ytdl-core');
+const { Ytdl, createPoTokenProvider } = require('@distube/ytdl-core');
 const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ytdl = new Ytdl();
+
+// Dynamic Ytdl instance manager with Proof-of-Origin (PO Token) & Cookie support
+// Bypasses YouTube datacenter bot detection ("Sign in to confirm you're not a bot") on Heroku/AWS
+let ytdlInstance = null;
+let poTokenPromise = null;
+
+async function getYtdl() {
+  if (ytdlInstance) return ytdlInstance;
+  if (!poTokenPromise) {
+    poTokenPromise = (async () => {
+      const cookie = process.env.YOUTUBE_COOKIE || undefined;
+      try {
+        console.log('🔄 Minting PO Token provider for cloud/Heroku bypass...');
+        const poTokenProvider = await createPoTokenProvider({ timeoutMs: 25000 });
+        console.log('✅ PO Token provider active (YouTube bot detection bypassed)');
+        return new Ytdl({
+          getPoToken: poTokenProvider,
+          cookie: cookie
+        });
+      } catch (err) {
+        console.warn('⚠️ Could not mint PO Token, falling back to default client:', err.message);
+        return new Ytdl({ cookie: cookie });
+      }
+    })();
+  }
+  ytdlInstance = await poTokenPromise;
+  return ytdlInstance;
+}
+
+// Pre-warm PO token on server startup
+getYtdl().catch(() => {});
 
 app.use(cors());
 app.use(express.json());
@@ -88,6 +118,7 @@ async function handleInfo(req, res) {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   try {
+    const ytdl = await getYtdl();
     const info = await ytdl.getInfo(videoUrl);
     const details = info.videoDetails;
 
@@ -272,6 +303,7 @@ app.get('/api/download', async (req, res) => {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   try {
+    const ytdl = await getYtdl();
     const info = await ytdl.getInfo(videoUrl);
     const title = sanitizeFilename(info.videoDetails.title);
 
