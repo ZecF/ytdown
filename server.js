@@ -60,15 +60,13 @@ async function getYtdl() {
         return new Ytdl({
           getPoToken: poTokenProvider,
           cookie: cookie,
-          lang: 'id',
-          country: 'ID'
+          lang: 'id'
         });
       } catch (err) {
         console.warn('⚠️ Could not mint PO Token, falling back to client:', err.message);
         return new Ytdl({
           cookie: cookie,
-          lang: 'id',
-          country: 'ID'
+          lang: 'id'
         });
       }
     })();
@@ -79,6 +77,22 @@ async function getYtdl() {
 
 // Pre-warm PO token on server startup
 getYtdl().catch(() => {});
+
+// Helper: get video info with automatic region/geo-fence fallback
+async function getVideoInfo(videoUrl) {
+  const ytdl = await getYtdl();
+  try {
+    return await ytdl.getInfo(videoUrl);
+  } catch (err) {
+    if (err.message && (err.message.includes('not made this video available in your country') || err.code === 'REGION_BLOCKED')) {
+      console.log('🌐 Region block detected, retrying with global fallback...');
+      const cookie = getCookie();
+      const fallbackYtdl = new Ytdl({ cookie, lang: 'id' });
+      return await fallbackYtdl.getInfo(videoUrl);
+    }
+    throw err;
+  }
+}
 
 app.use(cors());
 app.use(express.json());
@@ -232,7 +246,7 @@ async function handleInfo(req, res) {
 
   try {
     const ytdl = await getYtdl();
-    const info = await ytdl.getInfo(videoUrl);
+    const info = await getVideoInfo(videoUrl);
     const details = info.videoDetails;
 
     // Pick best thumbnail
@@ -427,7 +441,7 @@ app.get('/api/download', async (req, res) => {
 
   try {
     const ytdl = await getYtdl();
-    const info = await ytdl.getInfo(videoUrl);
+    const info = await getVideoInfo(videoUrl);
     const title = sanitizeFilename(info.videoDetails.title);
 
     // ==========================================
