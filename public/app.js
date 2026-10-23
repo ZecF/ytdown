@@ -31,6 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const toastTitle = document.getElementById('toastTitle');
   const toastMessage = document.getElementById('toastMessage');
 
+  const audioLangBar = document.getElementById('audioLangBar');
+  const audioLangSelect = document.getElementById('audioLangSelect');
+  const langPill = document.getElementById('langPill');
+  let currentVideoUrl = '';
+
   // Tab switching
   const tabBtns = document.querySelectorAll('.tab-btn');
   const tabPanes = document.querySelectorAll('.tab-pane');
@@ -135,15 +140,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Fetch Video Info from API
-  async function fetchVideoInfo(url) {
+  async function fetchVideoInfo(url, audioLang = 'id') {
     hideError();
     setLoading(true);
+    currentVideoUrl = url;
 
     try {
       const res = await fetch('/api/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url, audioLang })
       });
 
       const data = await res.json();
@@ -160,6 +166,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Handle user changing audio language dropdown
+  if (audioLangSelect) {
+    audioLangSelect.addEventListener('change', () => {
+      const chosenLang = audioLangSelect.value;
+      if (currentVideoUrl) {
+        fetchVideoInfo(currentVideoUrl, chosenLang);
+      }
+    });
+  }
+
   // Render video data & formats
   function renderVideoData(video) {
     videoThumb.src = video.thumbnail;
@@ -168,6 +184,31 @@ document.addEventListener('DOMContentLoaded', () => {
     videoChannel.textContent = video.channel;
     videoViews.textContent = `${video.viewsFormatted} tayangan`;
     videoDesc.textContent = video.description || 'Tidak ada deskripsi.';
+
+    // Setup Audio Language Selector
+    const audioLangs = video.audioLanguages || [];
+    if (audioLangs.length > 1) {
+      audioLangBar.style.display = 'flex';
+      audioLangSelect.innerHTML = '';
+      audioLangs.forEach(lang => {
+        const opt = document.createElement('option');
+        opt.value = lang.id;
+        opt.textContent = lang.name;
+        if (lang.id === video.selectedAudioLang) opt.selected = true;
+        audioLangSelect.appendChild(opt);
+      });
+
+      const selectedLangObj = audioLangs.find(l => l.id === video.selectedAudioLang);
+      if (selectedLangObj && selectedLangObj.isIndonesian) {
+        langPill.textContent = '🇮🇩 Bahasa Indonesia Aktif';
+        langPill.style.background = 'linear-gradient(135deg, #059669, #10b981)';
+      } else {
+        langPill.textContent = `🌐 ${selectedLangObj ? selectedLangObj.name : 'Audio Terpilih'}`;
+        langPill.style.background = 'rgba(99, 102, 241, 0.4)';
+      }
+    } else {
+      audioLangBar.style.display = 'none';
+    }
 
     // 1. Render Video Formats (Muxed / All Resolutions)
     videoFormatsBody.innerHTML = '';
