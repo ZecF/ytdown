@@ -59,11 +59,17 @@ async function getYtdl() {
         console.log('✅ PO Token provider active');
         return new Ytdl({
           getPoToken: poTokenProvider,
-          cookie: cookie
+          cookie: cookie,
+          lang: 'id',
+          country: 'ID'
         });
       } catch (err) {
         console.warn('⚠️ Could not mint PO Token, falling back to client:', err.message);
-        return new Ytdl({ cookie: cookie });
+        return new Ytdl({
+          cookie: cookie,
+          lang: 'id',
+          country: 'ID'
+        });
       }
     })();
   }
@@ -123,6 +129,88 @@ function extractVideoId(input) {
   return null;
 }
 
+// Utility: extract list of all audio languages available on the video
+function getAudioLanguages(formats) {
+  const map = new Map();
+  const audioFormats = formats.filter(f => !f.hasVideo && f.hasAudio);
+
+  audioFormats.forEach(f => {
+    if (f.audioTrack) {
+      const trackId = f.audioTrack.id || 'default';
+      const rawName = f.audioTrack.displayName || trackId;
+      const isIndonesian = trackId.toLowerCase().startsWith('id') || rawName.toLowerCase().includes('indonesia');
+      const key = isIndonesian ? 'id' : trackId;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          name: isIndonesian ? 'Bahasa Indonesia (Dubbing)' : rawName,
+          isDefault: !!f.audioTrack.audioIsDefault,
+          isIndonesian: isIndonesian
+        });
+      }
+    }
+  });
+
+  if (map.size === 0) {
+    map.set('original', {
+      id: 'original',
+      name: 'Bahasa Asli (Original)',
+      isDefault: true,
+      isIndonesian: false
+    });
+  }
+
+  // Indonesian first, then default track, then alphabetically
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.isIndonesian) return -1;
+    if (b.isIndonesian) return 1;
+    if (a.isDefault) return -1;
+    if (b.isDefault) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+// Utility: find best audio stream by target language (defaults to Indonesian if available)
+function findBestAudio(formats, targetLang = 'id') {
+  const audioFormats = formats.filter(f => !f.hasVideo && f.hasAudio);
+  if (audioFormats.length === 0) return null;
+
+  // 1. If targetLang is 'id' or default, prioritize Indonesian audio track
+  if (targetLang === 'id' || !targetLang) {
+    const idAudios = audioFormats.filter(f =>
+      f.audioTrack && (
+        f.audioTrack.id?.toLowerCase().startsWith('id') ||
+        f.audioTrack.displayName?.toLowerCase().includes('indonesia')
+      )
+    );
+    if (idAudios.length > 0) {
+      return idAudios.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+    }
+  }
+
+  // 2. Specific language ID requested
+  if (targetLang && targetLang !== 'id' && targetLang !== 'original') {
+    const matchAudios = audioFormats.filter(f =>
+      f.audioTrack && (
+        f.audioTrack.id?.toLowerCase().startsWith(targetLang.toLowerCase()) ||
+        f.audioTrack.displayName?.toLowerCase().includes(targetLang.toLowerCase())
+      )
+    );
+    if (matchAudios.length > 0) {
+      return matchAudios.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+    }
+  }
+
+  // 3. Default original audio track
+  const defaultAudios = audioFormats.filter(f => f.audioTrack?.audioIsDefault);
+  if (defaultAudios.length > 0) {
+    return defaultAudios.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+  }
+
+  // 4. Highest bitrate audio fallback
+  return audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+}
+
 /**
  * GET /api/info
  * POST /api/info
@@ -130,6 +218,7 @@ function extractVideoId(input) {
  */
 async function handleInfo(req, res) {
   const rawUrl = req.method === 'POST' ? req.body.url : req.query.url;
+  const requestedLang = (req.method === 'POST' ? req.body.audioLang : req.query.audioLang) || 'id';
   const videoId = extractVideoId(rawUrl);
 
   if (!videoId) {
@@ -154,19 +243,20 @@ async function handleInfo(req, res) {
 
     // Categorize formats
     const allFormats = info.formats || [];
+    const audioLanguages = getAudioLanguages(allFormats);
+    const hasIndonesian = audioLanguages.some(l => l.isIndonesian);
 
-    // Best audio format (for muxing with video-only streams)
-    const bestAudio = allFormats
-      .filter(f => !f.hasVideo && f.hasAudio)
-      .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+    // Active audio language: if requested is 'id' and Indonesian exists, use 'id'
+    const activeLang = (requestedLang === 'id' && !hasIndonesian)
+      ? (audioLanguages[0] ? audioLanguages[0].id : 'original')
+      : requestedLang;
 
+    // Best audio format for selected language
+    const bestAudio = findBestAudio(allFormats, activeLang);
     const audioSize = bestAudio ? (parseInt(bestAudio.contentLength, 10) || 0) : 0;
 
-    // 1. All Video Resolutions (Muxed with Audio if DASH, or Progressive if available)
+    // 1. All Video Resolutions (Muxed with chosen audio language)
     const resolutionMap = new Map();
-
-    // Priority for resolution quality
-    const resOrder = ['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p', '144p'];
 
     allFormats
       .filter(f => f.hasVideo)
@@ -174,7 +264,6 @@ async function handleInfo(req, res) {
         const quality = format.qualityLabel || `${format.height}p`;
         if (!quality) return;
 
-        // Clean quality tag (e.g. 1080p60 -> 1080p, but keep 60fps info)
         const match = quality.match(/^(\d+p)/);
         const baseKey = match ? match[1] : quality;
 
@@ -182,7 +271,8 @@ async function handleInfo(req, res) {
         const fpsLabel = is60fps ? ` (${format.fps}fps)` : '';
         const displayQuality = `${quality}${fpsLabel}`;
 
-        const isProgressive = format.hasVideo && format.hasAudio;
+        // If multi-language audio exists, we MUST mux to guarantee Indonesian dubbing!
+        const isProgressive = format.hasVideo && format.hasAudio && audioLanguages.length <= 1;
         const videoSize = parseInt(format.contentLength, 10) || 0;
         const estimatedBytes = isProgressive ? videoSize : (videoSize > 0 && audioSize > 0 ? videoSize + audioSize : videoSize);
 
@@ -194,14 +284,14 @@ async function handleInfo(req, res) {
           height: format.height || parseInt(baseKey, 10) || 0,
           fps: format.fps || 30,
           container: format.container || 'mp4',
-          hasAudio: isProgressive,
+          hasAudio: true,
           type: isProgressive ? 'progressive' : 'mux',
+          audioLang: activeLang,
           sizeBytes: estimatedBytes,
           sizeFormatted: formatBytes(estimatedBytes),
-          downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=${isProgressive ? 'progressive' : 'mux'}&itag=${format.itag}&quality=${encodeURIComponent(quality)}`
+          downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=${isProgressive ? 'progressive' : 'mux'}&itag=${format.itag}&quality=${encodeURIComponent(quality)}&audioLang=${encodeURIComponent(activeLang)}`
         };
 
-        // Prefer MP4 container and higher fps if already exists
         const existing = resolutionMap.get(baseKey);
         if (!existing) {
           resolutionMap.set(baseKey, item);
@@ -215,48 +305,49 @@ async function handleInfo(req, res) {
         }
       });
 
-    // Sort video resolutions by descending height
     const videoList = Array.from(resolutionMap.values()).sort((a, b) => b.height - a.height);
 
-    // 2. Audio Formats (MP3 transcode & M4A original)
+    // 2. Audio Formats in Selected Language
     const audioList = [];
+    const activeLangObj = audioLanguages.find(l => l.id === activeLang);
+    const langLabel = activeLangObj ? ` [${activeLangObj.name}]` : '';
 
-    // MP3 320kbps
     const durationSec = parseInt(details.lengthSeconds, 10) || 0;
     const mp3SizeEst = durationSec > 0 ? Math.round((320 * 1000 / 8) * durationSec) : 0;
     audioList.push({
-      label: 'MP3 Audio (High Quality)',
+      label: `MP3 Audio (High Quality)${langLabel}`,
       bitrate: '320 kbps',
       format: 'MP3',
       type: 'mp3',
+      audioLang: activeLang,
       sizeBytes: mp3SizeEst,
       sizeFormatted: formatBytes(mp3SizeEst),
-      downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=mp3&bitrate=320`
+      downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=mp3&bitrate=320&audioLang=${encodeURIComponent(activeLang)}`
     });
 
-    // MP3 128kbps (Standard)
     const mp3StdSizeEst = durationSec > 0 ? Math.round((128 * 1000 / 8) * durationSec) : 0;
     audioList.push({
-      label: 'MP3 Audio (Standard)',
+      label: `MP3 Audio (Standard)${langLabel}`,
       bitrate: '128 kbps',
       format: 'MP3',
       type: 'mp3',
+      audioLang: activeLang,
       sizeBytes: mp3StdSizeEst,
       sizeFormatted: formatBytes(mp3StdSizeEst),
-      downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=mp3&bitrate=128`
+      downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=mp3&bitrate=128&audioLang=${encodeURIComponent(activeLang)}`
     });
 
-    // M4A Original
     if (bestAudio) {
       audioList.push({
-        label: 'M4A Original (Direct Stream)',
+        label: `M4A Track Asli${langLabel}`,
         bitrate: `${bestAudio.audioBitrate || 128} kbps`,
-        format: bestAudio.container ? bestAudio.container.toUpperCase() : 'M4A',
+        format: (bestAudio.container || 'M4A').toUpperCase(),
         type: 'audio_direct',
         itag: bestAudio.itag,
+        audioLang: activeLang,
         sizeBytes: parseInt(bestAudio.contentLength, 10) || 0,
         sizeFormatted: formatBytes(parseInt(bestAudio.contentLength, 10)),
-        downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=single&itag=${bestAudio.itag}&ext=${bestAudio.container || 'm4a'}`
+        downloadUrl: `/api/download?url=${encodeURIComponent(videoUrl)}&type=single&itag=${bestAudio.itag}&ext=${bestAudio.container || 'm4a'}&audioLang=${encodeURIComponent(activeLang)}`
       });
     }
 
@@ -292,6 +383,9 @@ async function handleInfo(req, res) {
         uploadDate: details.uploadDate,
         thumbnail: bestThumbnail,
         description: (details.description || '').substring(0, 300),
+        audioLanguages: audioLanguages,
+        selectedAudioLang: activeLang,
+        hasIndonesianAudio: hasIndonesian,
         formats: {
           videos: videoList,
           audios: audioList,
@@ -322,7 +416,7 @@ app.post('/api/info', handleInfo);
  * Stream video/audio file with attachment header
  */
 app.get('/api/download', async (req, res) => {
-  const { url, type = 'single', itag, quality, bitrate = '320', ext = 'mp4' } = req.query;
+  const { url, type = 'single', itag, quality, bitrate = '320', ext = 'mp4', audioLang = 'id' } = req.query;
 
   const videoId = extractVideoId(url);
   if (!videoId) {
@@ -344,9 +438,7 @@ app.get('/api/download', async (req, res) => {
       res.header('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
       res.header('Content-Type', 'audio/mpeg');
 
-      const audioFormat = info.formats
-        .filter(f => !f.hasVideo && f.hasAudio && f.container === 'm4a')
-        .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0] ||
+      const audioFormat = findBestAudio(info.formats, audioLang || 'id') ||
         info.formats.filter(f => !f.hasVideo && f.hasAudio)[0];
 
       const audioStream = ytdl.download(videoUrl, { format: audioFormat });
@@ -406,9 +498,7 @@ app.get('/api/download', async (req, res) => {
       }
 
       // Best audio stream
-      const audioFormat = info.formats
-        .filter(f => !f.hasVideo && f.hasAudio && f.container === 'm4a')
-        .sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0] ||
+      const audioFormat = findBestAudio(info.formats, audioLang || 'id') ||
         info.formats.filter(f => !f.hasVideo && f.hasAudio)[0];
 
       const qLabel = videoFormat.qualityLabel || `${videoFormat.height}p`;
